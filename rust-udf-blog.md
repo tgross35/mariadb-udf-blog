@@ -27,6 +27,7 @@ Perhaps
 ### "API is Documentation"
 
 
+
  
 ### Code _correctness_
 
@@ -38,11 +39,24 @@ in Rust it is possible to check typing
   - Code cleans up
 
 
-## A Walkthrough
+
+## Examle UDF Walkthrough
 
 In this section, we will implement two extremely simple user-defined functions, and cover their
 writing, building, and using aspects.
 
+
+If you would like to follow along, you will need a copy of the Rust compiler >= 1.65. If
+you don't yet have Rust, get it from <https://rustup.rs/>. If you have it installed, run
+`rustup update` to get the latest version.
+
+```bash
+cargo new test-udf;
+```
+
+```toml
+
+```
 
 ## Behind the scenes
 
