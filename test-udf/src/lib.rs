@@ -3,7 +3,7 @@ use udf::prelude::*;
 #[derive(Debug, PartialEq)]
 struct RunningTotal(i64);
 
-impl BasicUdf for  RunningTotal {
+impl BasicUdf for RunningTotal {
     type Returns<'a> = i64;
 
     fn init(_cfg: &UdfCfg<Init>, args: &ArgList<Init>) -> Result<Self, String> {
@@ -37,7 +37,7 @@ mod tests {
         let mut cfg = MockUdfCfg::new();
         let mut arglist = mock_args![]; // empty
         let res = RunningTotal::init(cfg.build_init(), arglist.build_init());
-        
+
         assert_eq!(res, Err("Expected 1 argument; got 0".to_owned()));
     }
 
@@ -58,7 +58,7 @@ mod tests {
         let mut rt = RunningTotal::init(cfg.build_init(), arglist.build_init()).unwrap();
 
         let inputs = [10i64, 20, -4, 100, -50, 0];
-        let outputs  = [10i64, 30, 26, 126, 76, 76];
+        let outputs = [10i64, 30, 26, 126, 76, 76];
 
         for (inval, outval) in inputs.iter().zip(outputs.iter()) {
             let mut arglist = mock_args![(*inval, "", false)];
