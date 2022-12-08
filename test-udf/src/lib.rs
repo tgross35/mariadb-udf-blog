@@ -36,7 +36,7 @@ mod tests {
     fn test_wrong_args() {
         let mut cfg = MockUdfCfg::new();
         let mut arglist = mock_args![]; // empty
-        let res = RunningTotal::init(cfg.build_init(), arglist.build_init());
+        let res = RunningTotal::init(cfg.as_init(), arglist.as_init());
 
         assert_eq!(res, Err("Expected 1 argument; got 0".to_owned()));
     }
@@ -45,8 +45,8 @@ mod tests {
     fn test_single() {
         let mut cfg = MockUdfCfg::new();
         let mut arglist = mock_args![(10, "", false)];
-        let mut rt = RunningTotal::init(cfg.build_init(), arglist.build_init()).unwrap();
-        let res = rt.process(cfg.build_process(), arglist.build_process(), None);
+        let mut rt = RunningTotal::init(cfg.as_init(), arglist.as_init()).unwrap();
+        let res = rt.process(cfg.as_process(), arglist.as_process(), None);
 
         assert_eq!(res, Ok(10));
     }
@@ -55,14 +55,14 @@ mod tests {
     fn test_multiple() {
         let mut cfg = MockUdfCfg::new();
         let mut arglist = mock_args![(0, "", false)];
-        let mut rt = RunningTotal::init(cfg.build_init(), arglist.build_init()).unwrap();
+        let mut rt = RunningTotal::init(cfg.as_init(), arglist.as_init()).unwrap();
 
         let inputs = [10i64, 20, -4, 100, -50, 0];
         let outputs = [10i64, 30, 26, 126, 76, 76];
 
         for (inval, outval) in inputs.iter().zip(outputs.iter()) {
             let mut arglist = mock_args![(*inval, "", false)];
-            let res = rt.process(cfg.build_process(), arglist.build_process(), None);
+            let res = rt.process(cfg.as_process(), arglist.as_process(), None);
 
             assert_eq!(res, Ok(*outval));
         }
