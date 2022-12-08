@@ -16,25 +16,25 @@ doesn't require any experience with the language.
 
 Extensions to MariaDB can be written in anything that can produce a compiled
 dynamic library, which is typically C or C++ (the same languages the server
-itself is written in). There is absolutely nothing incorrect with this current
+itself is written in). There is absolutely nothing wrong with this current
 approach, but being able to write them in Rust has some advantages:
 
-* Protection from the most common [CWE]s (with the focus being on
-  overread/overwrite, use after free, null dereference)
-* Type safety can be leveraged to enforce code _correctness_
-* RAII prevents memory leaks. Rust's implementation is somewhat more
-  straightforward than in C++
-* API is documentation
+* Protection from the most common relevant [CWE]s is guaranteed at compile time
+  (specifically overread/overwrite, use after free, null dereference, and
+  race conditions)
+* Type safety can be leveraged to enforce code correctness
+* RAII prevents memory leaks (similar to C++, but Rust's implementation is
+  somewhat more straightforward)
 * Incredible toolchain; `cargo` is Rust's default build and dependency
   management system, which ships with every release. Out of the box, you get:
   * Compiling (`cargo check` / `cargo build`)
   * Linting (`cargo clippy`)
   * Testing (`cargo test`, alias `cargo t`)
   * Documentation (`cargo doc`, usually `cargo doc --document-private-items
-    --open`)
+    --open` for libraries)
   * Dependency management (configured in `Cargo.toml`)
 
-Databases, being a foundation of internet connectivity are at the intersection
+Databases, being a foundation of internet connectivity, are at the intersection
 of security and performance: any lag may noticibly reduce user experience, but
 security issues like buffer overreads may mean compromising or leaking user
 data. This is a niche that Rust is _particularly_ well adapted to.
@@ -43,19 +43,19 @@ If you aren't familiar with the language, you might be tempted to ask something
 like "how can something like a C interface or performance-oriented...?" The
 answer is fairly straightforward; things that require low-level tasks like
 pointer operations are possible within an `unsafe {...}` block. The `udf`
-library handles all these `unsafe` operations for you to provide a safe API.
+library handles all these `unsafe` operations, so it is possible to write a
+powerful UDF without being at risk for various potential exploits.
 
 [CWE]: https://cwe.mitre.org/top25/archive/2022/2022_cwe_top25.html
 
 
 ## Example UDF Walkthrough
 
-In this section, we will implement two extremely simple user-defined functions,
-and cover their writing, building, and using aspects.
+In this section, we will implement an extremely simple user-defined function
+and cover its writing, building, and usage aspects.
 
-
-If you would like to follow along, you will need a copy of the Rust compiler >=
-1.65. If you don't yet have Rust, get it from <https://rustup.rs/>. If you have
+If you would like to follow along, you will need a copy of the Rust compiler
+≥1.65. If you don't yet have Rust, get it from <https://rustup.rs/>. If you have
 it installed, run `rustup update` to ensure you are on the latest version. If
 you are using an IDE, get the [rust-analyzer] language server to help.
 
@@ -80,10 +80,10 @@ cargo test
 ```
 
 The above creates a directory called `test-udf` with a `Cargo.toml` file, and a
-`src/lib.rs` file with a simple function and test for it. We need to update
-`Cargo.toml` to tell Cargo to use `udf` as a depedency and to produce the
-correct kind of output.
-
+`src/lib.rs` file with a simple function and test for it, then verifies
+everything is working correctly. We need to update`Cargo.toml` to tell Cargo
+to produce the correct kind of output (a dynamic library) and to use `udf`
+as a depedency.
 
 ```toml
 [package]
@@ -105,7 +105,7 @@ You can delete everything in `lib.rs` and our setup is complete.
 
 ### UDF Architecture
 
-Let's write a super simple UDF that performs a running total of integers.
+Let's write a very simple UDF that performs a running total of integers.
 
 A UDF needs to provide three symbols to the server:
 
@@ -118,15 +118,15 @@ trait is of interest here and provides interfaces for `init` and `process`
 (`deinit` is handled automatically).
 
 This trait should be implemented on a structure representing data to be shared
-among calls to `process`, once per line. In this cast, the data is just our
+among calls to `process`, once per line. In this case, the data is just our
 current total.
 
 ```rust,skt-default
 struct RunningTotal(i64);
 ```
 
-I am using an "tuple struct" syntax here which just means you can access fields
-with numbers (`some_struct.0`, `some_struct.1`) rather than by names
+I am using an "tuple struct" syntax here which means you can access fields with
+numbers (`some_struct.0`, `some_struct.1`) rather than by names
 (`some_struct.field`). This is just a convenience as we only have one field, but
 you are more than welcome to use a standard struct (they're identical behind the
 scenes)
@@ -137,11 +137,12 @@ struct RunningTotal {
 }
 ```
 
-We need to do three things
+We now need to do three things
 
 * Import needed types and functions. `udf` has a `prelude` module with the most
   commonly needed imports, so we can just import everything there
 * Implement a trait for our struct
+* Add the `#[register]` macro to create the correct symbols
 
 The minimum compiling code looks like this
 
@@ -150,6 +151,7 @@ use udf::prelude::*;
 
 struct RunningTotal(i64);
 
+#[register]
 impl BasicUdf for  RunningTotal {
     type Returns<'a> = i64;
 
@@ -181,7 +183,8 @@ type Returns<'a> = i64;
 
 This is just where we specify the return type of our UDF. See [the docs] for
 more information about possible return types. Here, since we are working on
-integers, we will return an `i64`.
+integers, we will return an `i64`. (Ignore the `<'a>` - that is only relevant
+when returning references, which isn't applicable here).
 
 ```rust,skt-default
 # struct X;
@@ -197,11 +200,13 @@ and a list of arguments `args`. `Init` on these types is just a marker to
 indicate where they're being used (it's tied to what methods are available).
 
 The return type here is something called a [`Result`] which is a builtin `enum`.
-Rust `enums` can be used as in C (to represent fixed values), but they are more
-common as "tagged unions" (sometimes called "sum types"). This is where an
-instance of an enum can represent data that can be more than one type. `Result`
-is used to indicate possible failure and has two variants, in this case
-`Ok(Self)` and `Err(String)` (represented by generic types).
+Rust `enums` can be used as in C (to represent fixed values), but they are also
+"tagged unions" (sometimes called "sum types"). This is a super helpful concept
+where an instance of an enum can represent data that can be more than one type.
+`Result`is used to indicate possible failure and has two variants, in this case
+`Ok(Self)` or `Err(String)`. So, the type of a successful function call will be
+`Self` (i.e., `RunningTotal` which gets saved for later use) and an error will
+be a `String` (which gets displlayed to the user). Makes sense, right?
 
 `todo!()` is a macro (anything ending with a `!` is) that just matches whatever
 type signature is needed to compile. If we actually tried to run it would fail,
@@ -220,23 +225,260 @@ There are warnings about unused arguments, but the Basic structure is all set!
 [`Result`]: https://doc.rust-lang.org/std/result/enum.Result.html
 
 
-### UDF Implementation
+### UDF Implementation: `init`
 
 Now that we have our basic structure, let's take a look at how to get some results.
 
-The main goal of our `init` function is to validate arguments.
+The main goal of our `init` function is to validate arguments. Let's look at the
+result then break it down:
+
+```rust,skt-default
+# struct X; impl X {
+fn init(_cfg: &UdfCfg<Init>, args: &ArgList<Init>) -> Result<Self, String> {
+    if args.len() != 1 {
+        return Err(format!("Expected 1 argument; got {}", args.len()));
+    }
+
+    // Coerce everything to an integer
+    args.get(0).unwrap().set_type_coercion(SqlType::Int);
+
+    Ok(Self(0))
+}
+# }
+```
+
+The first part here checks out argument count:
+
+```rust
+if args.len() != 1 {
+    return Err(format!("Expected 1 argument; got {}", args.len()));
+}
+```
+
+The number of arguments should be one. If not, it creates a formatted error
+message and returns it as an error (`Err(something)` is how to construct a
+`Result` enum error variant).
+
+The second logical block:
+
+```rust
+args.get(0).unwrap().set_type_coercion(SqlType::Int);
+```
+
+Uses `.get(0)` to attempt to get the first argument. This returns an
+`Option<SqlArg>`which is another builtin enum type like Result. This has two
+possible variants: `Some(T)` to represent an existing value of type T, and
+`None` to represent nothing. `unwrap()` is used to get the inner value out of a
+`Some()` value, or panic if there is `None`. It should be noted that panicking
+is a very bad idea in UDFs and should absolutely be avoided. We have already
+verified that there is a single argument here though, so unwrapping is OK in
+this case.
+
+```rust
+Ok(Self(0))
+```
+
+The last section simply creates a `Self` instance with 0 as its inner value,
+and returns it as a successful call.
+
+
+### UDF Implementation: `process`
+
+The `process` function is also fairly simple:
+
+```rust
+fn process<'a>(
+    &'a mut self,
+    _cfg: &UdfCfg<Process>,
+    args: &ArgList<Process>,
+    _error: Option<NonZeroU8>,
+) -> Result<Self::Returns<'a>, ProcessError> {
+    // Get the value as an integer and add it to our total
+    self.0 += args.get(0).unwrap().value().as_int().unwrap_or(0);
+
+    // The result is just our running total
+    Ok(self.0)
+}
+```
+
+The first line contains most of the logic, and uses combinators to keep things
+terse. It does the following:
+
+* `args.get(0).unwrap()`: this gets the first argument, as discussed above. We
+  are OK to unwrap here because we validated our arguments (`init` and `process`
+  get the same number of arguments when they are called, and we performed
+  validation in init)
+* `.value()` gets the argument's value, which is a `SqlResult`. This is an enum
+  with variants for `String`, `Real`, `Int`, and `Decimal`.
+* `.as_int()` is a convenience function that returns an `Option`. If the value
+  is an nonnull integer, it will return `Some(i64)`. Any other possibilities
+  will return None. Because we set type coercion in `init`, we can reasonably
+  expect that all values will be an integer or null.
+* `unwrap_or(0)` acts the same as `unwrap()` when the value is `Some`, but uses
+  the specified value (0) when the value is `None`. This means that any null
+  values have no effect on our sum.
+
+The last line `Ok(self.0)` just returns our struct's inner value, which
+represents our current running total. With that, our process function is
+complete!
 
 
 ### Unit Testing
 
+The `udf` crate provides functionality to thoroughly test UDF implementations
+without even loading them into SQL. If you aren't familiar, it is worth looking
+at the basics of Rust's [unit testing] for a brief outline.
+
+We need to update our `udf` dependency to use the `mock` feature so we can
+access that feature-gated module. Change the dependency line to look like the
+following:
+
+```toml
+udf = { version = "0.4", features = ["mock"] }
+```
+
+And add the following below our test UDF:
+
+```rust
+#[cfg(test)]
+mod tests {i
+    // Use our parent module
+    use super::*;
+    use udf::mock::*;
+
+    #[test]
+    fn test_basic() {
+        // Create a mock `UdfCfg` and mock `UdfArgs`
+        let mut cfg = MockUdfCfg::new();
+        let mut row_args = [
+            // Each entry here acts as a row. Format for the macro is
+            // `([type] value, "attribute name", nullable)`
+            mock_args![(Int None, "", false)],
+            mock_args![(10, "", false)],
+            mock_args![(Int None, "", false)],
+            mock_args![(-20, "", false)],
+        ];
+
+        // Run the `init` function on our mock data
+        let mut rt = RunningTotal::init(cfg.as_init(), row_args[0].as_init()).unwrap();
+
+        // Expected output after each of our "row"s
+        let outputs = [0i64, 10, 10, -10];
+
+        for (arglist, outval) in row_args.iter_mut().zip(outputs.iter()) {
+            // Run the process function and verify the result
+            let res = rt.process(cfg.as_process(), arglist.as_process(), None);
+            assert_eq!(res, Ok(*outval));
+        }
+    }
+}
+```
+
+Let's check the result:
+
+```
+running 1 test
+test tests::test_basic ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+Excellent!
+
+See [this blog post's repository] for some more example unit tests. With good
+unit testing, it is possible to be highly confident that a UDF performs as
+expected without even loading it into our server.
+
+[unit testing]: https://doc.rust-lang.org/rust-by-example/testing/unit_testing.html#unit-testing
+[this blog post's repository]: https://github.com/tgross35/mariadb-udf-blog
+
 
 ### Loading the Function
 
+The final test for our UDF is to actually run it in a server. Building a `.so`
+file that can be loaded into MariaDB is easy (`cargo build --release`, output
+is in `target/release`) but testing is easier with a dockerfile:
 
-### Integration Testing
+```Dockerfile
+FROM rust:latest AS build
 
+WORKDIR /build
 
-### Aggregate UDF
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/target \
+    cargo build --release \
+    && mkdir /output \
+    && cp target/release/libMY_CRATE_NAME.so /output
 
+FROM mariadb:10.9
 
-## Behind the scenes
+COPY --from=build /output/* /usr/lib/mysql/plugin/
+
+# # Do NOT use this for production
+ENV MARIADB_ROOT_PASSWORD=example
+```
+
+(this docker image uses cache which is a feature of Docker buildkit. Make sure
+you are using a newer version of Docker, or have the environment variable set
+correctly to enable it. Or, remove the cache indicators).
+
+Be sure to update file name at `MY_CRATE_NAME` (`libtest_udf.so` if you
+followed the earlier suggestion). The following runs and builds our image:
+
+```bash
+# Build the image
+docker build . --tag mdb-blog-udf
+
+# Run the image and name it mariadb_blog_udf for convenience
+docker run --rm -d --name mariadb_blog_udf mdb-blog-udf
+
+# Enter the SQL console
+docker exec -it mariadb_blog_udf mysql -pexample
+```
+
+Let's load our function and test it:
+
+```sql
+MariaDB [(none)]> CREATE FUNCTION running_total RETURNS integer SONAME 'libtest_udf.so';
+Query OK, 0 rows affected (0.003 sec)
+
+MariaDB [(none)]> select running_total(1, 2, 3);
+ERROR 1123 (HY000): Can't initialize function 'running_total'; Expected 1 argument; got 3
+MariaDB [(none)]> select running_total(1);
++------------------+
+| running_total(1) |
++------------------+
+|                1 |
++------------------+
+1 row in set (0.000 sec)
+```
+
+So far so good! Now a slightly harder test
+
+```sql
+MariaDB [(none)]> create database db; use db;
+Query OK, 1 row affected (0.000 sec)
+Database changed
+
+MariaDB [db]> create table t1 (val int);
+Query OK, 0 rows affected (0.025 sec)
+
+MariaDB [db]> select val, running_total(val) from t1;
++-----------+--------------------+
+| val       | running_total(val) |
++-----------+--------------------+
+|         1 |                  1 |
+|         2 |                  3 |
+|         3 |                  6 |
+|      NULL |                  6 |
+|      -100 |                -94 |
+|        50 |                -44 |
+| 123456789 |          123456745 |
++-----------+--------------------+
+7 rows in set (0.000 sec)
+```
+
+Perfect!
+
+## Wrapup

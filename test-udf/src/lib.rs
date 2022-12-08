@@ -3,6 +3,7 @@ use udf::prelude::*;
 #[derive(Debug, PartialEq)]
 struct RunningTotal(i64);
 
+#[register]
 impl BasicUdf for RunningTotal {
     type Returns<'a> = i64;
 
@@ -11,6 +12,7 @@ impl BasicUdf for RunningTotal {
             return Err(format!("Expected 1 argument; got {}", args.len()));
         }
 
+        // Coerce everything to an integer
         args.get(0).unwrap().set_type_coercion(SqlType::Int);
 
         Ok(Self(0))
@@ -22,7 +24,10 @@ impl BasicUdf for RunningTotal {
         args: &ArgList<Process>,
         _error: Option<NonZeroU8>,
     ) -> Result<Self::Returns<'a>, ProcessError> {
-        self.0 += args.get(0).unwrap().value().as_int().unwrap();
+        // Get the value as an integer and add it to our total
+        self.0 += args.get(0).unwrap().value().as_int().unwrap_or(0);
+
+        // The result is just our running total
         Ok(self.0)
     }
 }
@@ -49,6 +54,26 @@ mod tests {
         let res = rt.process(cfg.as_process(), arglist.as_process(), None);
 
         assert_eq!(res, Ok(10));
+    }
+
+    #[test]
+    fn test_null() {
+        // We need to verify that we handle null variables correctly
+        let mut cfg = MockUdfCfg::new();
+        let mut row_args = [
+            mock_args![(Int None, "", false)],
+            mock_args![(10, "", false)],
+            mock_args![(Int None, "", false)],
+            mock_args![(-20, "", false)],
+        ];
+        let mut rt = RunningTotal::init(cfg.as_init(), row_args[0].as_init()).unwrap();
+
+        let outputs = [0i64, 10, 10, -10];
+
+        for (arglist, outval) in row_args.iter_mut().zip(outputs.iter()) {
+            let res = rt.process(cfg.as_process(), arglist.as_process(), None);
+            assert_eq!(res, Ok(*outval));
+        }
     }
 
     #[test]

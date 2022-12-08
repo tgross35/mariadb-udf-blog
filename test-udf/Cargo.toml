@@ -9,8 +9,9 @@ publish = false # prevent accidentally publishing to crates.io
 crate-type = ["cdylib"]
 
 [dependencies]
-udf = { version = "0.4", features = ["mock"] }# our dependency on the `udf` crate
+udf = { version = "0.4", features = ["mock"] } # our dependency on the `udf` crate
 
+# Ignore the below, it's strictly for testing the markdown file
 [build-dependencies]
 skeptic = "0.13"
 
