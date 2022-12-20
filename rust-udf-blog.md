@@ -525,4 +525,4 @@ Try the example or try your own function; you are welcome to join us on [Zulip]
 to discuss the results. Happy programming!
 
 [this blog post's repository]: https://github.com/tgross35/mariadb-udf-blog
-[Zulip](https://mariadb.zulipchat.com/)
+[Zulip]: https://mariadb.zulipchat.com/
