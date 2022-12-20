@@ -9,7 +9,7 @@ impl BasicUdf for RunningTotal {
 
     fn init(_cfg: &UdfCfg<Init>, args: &ArgList<Init>) -> Result<Self, String> {
         if args.len() != 1 {
-            return Err(format!("Expected 1 argument; got {}", args.len()));
+            return Err(format!("expected 1 argument; got {}", args.len()));
         }
 
         // Coerce everything to an integer
@@ -43,7 +43,7 @@ mod tests {
         let mut arglist = mock_args![]; // empty
         let res = RunningTotal::init(cfg.as_init(), arglist.as_init());
 
-        assert_eq!(res, Err("Expected 1 argument; got 0".to_owned()));
+        assert_eq!(res, Err("expected 1 argument; got 0".to_owned()));
     }
 
     #[test]
