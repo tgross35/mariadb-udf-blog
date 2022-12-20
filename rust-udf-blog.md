@@ -282,17 +282,23 @@ It should be noted that panicking is a very bad idea in UDFs and should absolute
 be avoided. We have already verified that there is a single argument here though,
 so unwrapping is OK in this case.
 
+Once we have our argument, we are able to use `set_type_coercion` to instruct the
+server to either coerce the first argument to an integer, or cancel the function
+call with an error.
+
 ```rust,skt-impl-ret
 Ok(Self(0))
 ```
 
 The last section simply creates a `Self` instance with 0 as its inner value, and
-returns it as a successful call. That's all that is needed in the `init` phase.
+wrappes it in `Ok` to indicate success. In Rust, the last line of any block that
+is that block's value if it doesn't end in a semicolon, so this statement is our
+return value. That's all that is needed in the `init` phase.
 
 
 ### UDF Implementation: `process`
 
-The `process` function is also fairly simple:
+The `process` function also has a fairly simple body:
 
 ```rust,skt-impl
 fn process<'a>(
@@ -313,9 +319,9 @@ The first line contains most of the logic, and uses combinators to keep things
 terse. It does the following:
 
 * `args.get(0).unwrap()`: this gets the first argument, as discussed above. We
-  are OK to unwrap here because we validated our arguments (`init` and `process`
-  get the same number of arguments when they are called, and we performed
-  validation in init)
+  are again OK to unwrap here because we validated our arguments (`init` and
+  `process` get the same number of arguments when they are called, and we
+  performed validation in init)
 * `.value()` gets the argument's value, which is a `SqlResult`. This is an enum
   with variants for `String`, `Real`, `Int`, and `Decimal`.
 * `.as_int()` is a convenience function that returns an `Option`. If the value
@@ -324,10 +330,10 @@ terse. It does the following:
   expect that all values will be an integer or null.
 * `unwrap_or(0)` acts the same as `unwrap()` when the value is `Some`, but uses
   the specified value (0) when the value is `None`. This means that any null
-  values have no effect on our sum.
+  values will use 0 so they don't .
 
-The last line `Ok(self.0)` just returns our struct's inner value, which
-represents our current running total. With that, our process function is
+We add this to our struct's inner value, `self.0`, which represents our current
+running total. We then return it with `Ok(self.0)`. With that, our process function is
 complete!
 
 
@@ -358,6 +364,9 @@ mod tests {
     fn test_basic() {
         // Create a mock `UdfCfg` and mock `UdfArgs`
         let mut cfg = MockUdfCfg::new();
+        
+        // Create an array of mock row arguments. We will "run" our function with each
+        // one and verify the result
         let mut row_args = [
             // Each entry here acts as a row. Format for the macro is
             // `([type] value, "attribute name", nullable)`
@@ -366,13 +375,14 @@ mod tests {
             mock_args![(Int None, "", false)],
             mock_args![(-20, "", false)],
         ];
+        
+        // This is the expected output after each of the above calls
+        let outputs = [0i64, 10, 10, -10];
 
         // Run the `init` function on our mock data
         let mut rt = RunningTotal::init(cfg.as_init(), row_args[0].as_init()).unwrap();
 
-        // Expected output after each of our "row"s
-        let outputs = [0i64, 10, 10, -10];
-
+        // Iterate through our list of arguments
         for (arglist, outval) in row_args.iter_mut().zip(outputs.iter()) {
             // Run the process function and verify the result
             let res = rt.process(cfg.as_process(), arglist.as_process(), None);
@@ -403,11 +413,12 @@ expected without even loading it into our server.
 ### Loading the Function
 
 The final test for our UDF is to actually run it in a server. Building a `.so`
-file that can be loaded into MariaDB is easy (`cargo build --release`, output
-is in `target/release`) but testing is easier with a dockerfile:
+or `.dll` file that can be loaded into MariaDB is easy - `cargo build --release`
+produces the output, which will be located in `target/release`. If you have
+Docker however, testing in an isolated environment is even easier:
 
 ```Dockerfile
-FROM rust:latest AS build
+FROM rust:1.66 AS build
 
 WORKDIR /build
 
@@ -443,7 +454,8 @@ docker run --rm -d -e MARIADB_ROOT_PASSWORD=example --name mariadb_blog_udf mdb-
 docker exec -it mariadb_blog_udf mysql -pexample
 ```
 
-Let's load our function and test it:
+Let's load our function, test it with the wrong number of arguments, and test it with
+the correct number of arguments:
 
 ```sql
 MariaDB [(none)]> CREATE FUNCTION running_total RETURNS integer SONAME 'libtest_udf.so';
