@@ -242,7 +242,7 @@ implementation then break it down:
 ```rust,skt-impl
 fn init(_cfg: &UdfCfg<Init>, args: &ArgList<Init>) -> Result<Self, String> {
     if args.len() != 1 {
-        return Err(format!("Expected 1 argument; got {}", args.len()));
+        return Err(format!("expected 1 argument; got {}", args.len()));
     }
 
     // Coerce everything to an integer
@@ -256,7 +256,7 @@ The first part here checks out argument count:
 
 ```rust,skt-args-check
 if args.len() != 1 {
-    return Err(format!("Expected 1 argument; got {}", args.len()));
+    return Err(format!("expected 1 argument; got {}", args.len()));
 }
 ```
 
@@ -454,15 +454,15 @@ docker run --rm -d -e MARIADB_ROOT_PASSWORD=example --name mariadb_blog_udf mdb-
 docker exec -it mariadb_blog_udf mysql -pexample
 ```
 
-Let's load our function, test it with the wrong number of arguments, and test it with
-the correct number of arguments:
+Let's load our function and test it, first with too many arguments and then with the
+correct argument count:
 
 ```sql
 MariaDB [(none)]> CREATE FUNCTION running_total RETURNS integer SONAME 'libtest_udf.so';
 Query OK, 0 rows affected (0.003 sec)
 
 MariaDB [(none)]> select running_total(1, 2, 3);
-ERROR 1123 (HY000): Can't initialize function 'running_total'; Expected 1 argument; got 3
+ERROR 1123 (HY000): Can't initialize function 'running_total'; xpected 1 argument; got 3
 
 MariaDB [(none)]> select running_total(10);
 +-------------------+
@@ -519,5 +519,10 @@ Helpful links:
 - `udf` library [repository page](https://github.com/pluots/sql-udf) and
   [documentation](https://docs.rs/udf/latest/udf/)
 - MariaDB [UDF usage documentation](https://mariadb.com/kb/en/create-function-udf/)
+- [Simple suite of UDFs written in Rust](https://github.com/pluots/udf-suite)
+
+Try the example or try your own function; you are welcome to join us on [Zulip]
+to discuss the results. Happy programming!
 
 [this blog post's repository]: https://github.com/tgross35/mariadb-udf-blog
+[Zulip](https://mariadb.zulipchat.com/)
