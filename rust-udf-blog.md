@@ -209,9 +209,10 @@ Rust `enums` can be used as in C (to represent fixed values), but they are also
 where an instance of an enum can safely represent data that may be one type `or`
 another, like a C `union` but with the interface to correctly figure out the type.
 `Result`is used to indicate possible failure and has two variants, in this case
-`Ok(Self)` or `Err(String)`. So, the type of a successful function call will be
-`Self` (i.e., `RunningTotal` which gets saved for later use) and an error will
-be a `String` (which gets displayed to the user). Makes sense, right?
+`Ok(Self)` or `Err(String)`. So, from our function signature we can tell that
+the type of a successful function call will be `Self` (i.e., `RunningTotal` which
+gets saved for later use) and an error will be a `String` (which gets displayed
+to the user). Makes sense, right?
 
 `todo!()` is a macro (anything ending with a `!` is) that is built in and just
 matches whatever type signature is needed to compile. If we actually tried to
@@ -224,7 +225,7 @@ warning: `test-udf` (lib) generated 5 warnings (run `cargo fix --lib -p test-udf
     Finished dev [unoptimized + debuginfo] target(s) in 0.07s
 ```
 
-There are warnings about unused arguments, but the Basic structure is all set!
+There are warnings about unused arguments, but the basic structure is all set!
 
 [The docs on `BasicUdf`]: https://docs.rs/udf/latest/udf/trait.BasicUdf.html
 [the docs]: (https://docs.rs/udf/latest/udf/trait.BasicUdf.html#associatedtype.Returns)
@@ -236,7 +237,7 @@ There are warnings about unused arguments, but the Basic structure is all set!
 Now that we have our basic structure, let's take a look at how to get some results.
 
 The main goal of our `init` function is to validate arguments. Let's look at the
-result then break it down:
+implementation then break it down:
 
 ```rust,skt-impl
 fn init(_cfg: &UdfCfg<Init>, args: &ArgList<Init>) -> Result<Self, String> {
@@ -260,7 +261,7 @@ if args.len() != 1 {
 ```
 
 The number of arguments should be one. If not, it creates a formatted error
-message and returns it as an error (`Err(something)` is how to construct a
+message string and returns it (`Err(something)` is how to construct a
 `Result` enum error variant).
 
 The second logical block:
@@ -270,13 +271,16 @@ args.get(0).unwrap().set_type_coercion(SqlType::Int);
 ```
 
 Uses `.get(0)` to attempt to get the first argument. This returns an
-`Option<SqlArg>`which is another builtin enum type like `Result`. This has two
-possible variants: `Some(T)` to represent an existing value of type T, and
-`None` to represent nothing. `unwrap()` is used to get the inner value out of a
-`Some()` value, or panic if there is `None`. It should be noted that panicking
-is a very bad idea in UDFs and should absolutely be avoided. We have already
-verified that there is a single argument here though, so unwrapping is OK in
-this case.
+`Option<SqlArg>`which is another builtin enum type like `Result`.
+
+`Option<T>` has two possible variants: `Some(T)` to represent an existing value
+of type T, and `None` to represent nothing. `unwrap()` is used to get the inner
+value out of a `Some()` value, or panic if there is `None`, so we use it to get
+the argument at index 0 (first argument).
+
+It should be noted that panicking is a very bad idea in UDFs and should absolutely
+be avoided. We have already verified that there is a single argument here though,
+so unwrapping is OK in this case.
 
 ```rust,skt-impl-ret
 Ok(Self(0))
