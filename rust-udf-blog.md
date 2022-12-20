@@ -6,10 +6,10 @@ compiled functions loaded from dynamic binaries that can be much more performant
 and flexible than stored functions or procedures written in SQL, providing the
 same capabilities as builtin functions.
 
-These UDFs are typically written in C or C++, but, a library is now available
+These UDFs are typically written in C or C++, but a library is now available
 that makes it easy to write them in Rust. This blog discusses some of the
-reasoning for writing this library, followed by a very basic example that
-doesn't require any experience with the language.
+reasoning for writing this library, followed by a very basic usage example
+that doesn't require any experience with the language.
 
 
 ## Why Rust?
@@ -35,14 +35,14 @@ being able to write them in Rust has some advantages:
   * Dependency management (configured in `Cargo.toml`)
 
 Databases are applications where performance bottlenecks can easily bog down the
-web services they drive. They must also be extremely cautious to avoid security
+web services they drive. They must also take extreme care to avoid security
 issues, since easy to miss things like buffer overreads can mean compromising
 sensitive data. Rust is particularly well suited to this niche, providing
 performance similar to (or even better than) C and C++, while guaranteeing
 against those languages' most common security pitfalls.
 
 If you aren't familiar with the language, you likely have questions like "how
-can these guarantees made while still allowing lower-level code and things like
+can these guarantees be made while still allowing lower-level code and things like
 C interfaces?" The answer is fairly straightforward; things that require
 potentially unsound tasks (pointer operations, potentially thread-unsafe things,
 inline assembly, C FFI) are possible within an `unsafe {...}` block (and only
@@ -50,7 +50,7 @@ within these blocks). This means that these small few lines of code can be
 easily identified and thoroughly verified then wrapped within a safe API, and
 anything built on top is guaranteed to be sound as long as the `unsafe` sections
 are. Since the `udf` library handles all these `unsafe` operations for you, it
-is possible to write most UDFs entirely in safe code.
+is possible to write almost any UDF entirely in safe code.
 
 [CWE]: https://cwe.mitre.org/top25/archive/2022/2022_cwe_top25.html
 
@@ -60,10 +60,11 @@ is possible to write most UDFs entirely in safe code.
 In this section, we will implement an extremely simple user-defined function
 and cover its writing, building, and usage aspects.
 
-If you would like to follow along, you will need a copy of the Rust compiler
-≥1.65. If you don't yet have Rust, get it from <https://rustup.rs/>. If you have
-it installed, run `rustup update` to ensure you are on the latest version. If
-you are using an IDE, get the [rust-analyzer] language server to help.
+If you would like to follow along, you will a Rust compiler with version ≥1.65
+(because of dependence on GATs). If you don't yet have Rust, get it from
+<https://rustup.rs/>. If you have it installed, run `rustup update` to ensure
+you are on the latest version. If you are using an IDE, get the [rust-analyzer]
+language server to help.
 
 [rust-analyzer]: https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer
 
@@ -85,9 +86,9 @@ cargo check
 cargo test
 ```
 
-The above creates a directory called `test-udf` with a `Cargo.toml` file, and a
-`src/lib.rs` file with a simple function and test for it, then verifies
-everything is working correctly. We need to update`Cargo.toml` to tell Cargo
+The above creates a directory called `test-udf` with `Cargo.toml` and `src/lib.rs`,
+then verifies everything is working correctly (the `cargo new` command makes a
+super simple example function and test). We need to update`Cargo.toml` to tell Cargo
 to produce the correct kind of output (a dynamic library) and to use `udf`
 as a depedency:
 
@@ -113,7 +114,7 @@ You can delete everything in `lib.rs` and our setup is complete.
 
 Let's write a very simple UDF that performs a running total of integers.
 
-A UDF needs to provide three symbols to the server:
+A UDF typically needs to make three symbols available to the server:
 
 * An `init` call that validates argument type and performs memory allocation
 * A `process` call run once per row that produces a result
@@ -135,7 +136,7 @@ I am using an "tuple struct" syntax here which means you can access fields with
 numbers (`some_struct.0`, `some_struct.1`) rather than by names
 (`some_struct.field`). This is just a convenience as we only have one field, but
 you are more than welcome to use a standard struct (they're identical behind the
-scenes)
+scenes):
 
 ```rust,skt-default
 struct RunningTotal {
@@ -147,7 +148,7 @@ We now need to do three things
 
 * Import needed types and functions. `udf` has a `prelude` module with the most
   commonly needed imports, so we can just import everything there
-* Implement a trait for our struct
+* Implement the `BasicUdf` trait for our struct
 * Add the `#[register]` macro to create the correct symbols
 
 The minimum compiling code looks like this
@@ -188,8 +189,8 @@ type Returns<'a> = i64;
 ```
 
 This is just where we specify the return type of our UDF. See [the docs] for
-more information about possible return types. Here, since we are working on
-integers, we will return an `i64`. (Ignore the `<'a>` - that is only relevant
+more information about possible return types. Here, since we will return a non-null
+integer, we will return an `i64`. (Ignore the `<'a>` - that is only relevant
 when returning references, which isn't applicable here).
 
 ```rust,skt-impl
@@ -205,8 +206,8 @@ indicate where they're being used (it's tied to what methods are available).
 The return type here is something called a [`Result`] which is a builtin `enum`.
 Rust `enums` can be used as in C (to represent fixed values), but they are also
 "tagged unions" (sometimes called "sum types"). This is a super helpful concept
-where an instance of an enum can safely represent data that can be more than one
-type (like a C `union` but with the interface to correctly figure out the type).
+where an instance of an enum can safely represent data that may be one type `or`
+another, like a C `union` but with the interface to correctly figure out the type.
 `Result`is used to indicate possible failure and has two variants, in this case
 `Ok(Self)` or `Err(String)`. So, the type of a successful function call will be
 `Self` (i.e., `RunningTotal` which gets saved for later use) and an error will
