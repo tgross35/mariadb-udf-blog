@@ -144,6 +144,9 @@ struct RunningTotal {
 }
 ```
 
+In either case, our struct name will get converted to snake case to give the SQL
+function name (so `Runningtotal` becomes `running_total(...)`).
+
 We now need to do three things
 
 * Import needed types and functions. `udf` has a `prelude` module with the most
