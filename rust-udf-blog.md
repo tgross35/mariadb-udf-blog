@@ -103,7 +103,7 @@ publish = false # prevent accidentally publishing to crates.io
 crate-type = ["cdylib"]
 
 [dependencies]
-udf = "0.4" # our dependency on the `udf` crate
+udf = "0.5" # our dependency on the `udf` crate
 ```
 
 You can delete everything in `lib.rs` and our setup is complete.
@@ -337,7 +337,7 @@ access that feature-gated module. Change the dependency line to look like the
 following:
 
 ```toml
-udf = { version = "0.4", features = ["mock"] }
+udf = { version = "0.5", features = ["mock"] }
 ```
 
 And add the following below our test UDF:
