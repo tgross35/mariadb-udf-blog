@@ -457,7 +457,7 @@ docker exec -it mariadb_blog_udf mysql -pexample
 Let's load our function and test it, first with too many arguments and then with the
 correct argument count:
 
-```sql
+```
 MariaDB [(none)]> CREATE FUNCTION running_total RETURNS integer SONAME 'libtest_udf.so';
 Query OK, 0 rows affected (0.003 sec)
 
@@ -475,7 +475,7 @@ MariaDB [(none)]> select running_total(10);
 
 So far so good! Now a slightly harder test
 
-```sql
+```
 MariaDB [(none)]> create database db; use db; create table t1 (val int);
 Query OK, 1 row affected (0.000 sec)
 
