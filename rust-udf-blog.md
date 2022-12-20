@@ -210,7 +210,7 @@ type (like a C `union` but with the interface to correctly figure out the type).
 `Result`is used to indicate possible failure and has two variants, in this case
 `Ok(Self)` or `Err(String)`. So, the type of a successful function call will be
 `Self` (i.e., `RunningTotal` which gets saved for later use) and an error will
-be a `String` (which gets displlayed to the user). Makes sense, right?
+be a `String` (which gets displayed to the user). Makes sense, right?
 
 `todo!()` is a macro (anything ending with a `!` is) that is built in and just
 matches whatever type signature is needed to compile. If we actually tried to

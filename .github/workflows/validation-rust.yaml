@@ -180,9 +180,6 @@ jobs:
         with:
           command: fmt
           args: --all --manifest-path test-udf/Cargo.toml -- --check
-      - uses: actions/setup-python@v3
-      - name: Validate pre-commit
-        uses: pre-commit/action@v3.0.0
 
   clippy:
     name: "Clippy (cargo clippy)"
